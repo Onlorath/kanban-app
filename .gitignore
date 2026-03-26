@@ -22,12 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Electron build output
-release/
-*.asar
-*.exe
-*.exe.blockmap
-*.pdb
-*.app
-*.dmg
