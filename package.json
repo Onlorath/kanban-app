@@ -38,7 +38,7 @@
     "appId": "com.kanban.app",
     "productName": "Kanban",
     "mac": {
-      "target": ["dir"],
+      "target": ["dmg", "dir"],
       "category": "public.app-category.productivity",
       "identity": null
     },
