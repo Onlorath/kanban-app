@@ -15,6 +15,7 @@ import {
   updateTask,
   deleteTask,
   getAllTasks,
+  archiveTasks,
 } from './utils/boardUtils'
 
 const SETTINGS_KEY = 'kanban_settings'
@@ -78,6 +79,9 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [confirmModal, setConfirmModal] = useState(null)
 
+  // Sayfa
+  const [view, setView] = useState('board')
+
   // Görev draft
   const [taskDraft, setTaskDraft] = useState({
     title: '', description: '', priority: 'medium', dueDate: '', dueTime: '', columnId: '',
@@ -89,6 +93,24 @@ function App() {
   useEffect(() => { setBoard(loadBoard()) }, [])
   useEffect(() => { if (board) saveBoard(board) }, [board])
   useEffect(() => { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)) }, [settings])
+
+  // Otomatik arşivleme: uygulama açıldığında ve her dakika kontrol
+  const lastArchiveCheck = useRef(null)
+  useEffect(() => {
+    if (!board) return
+
+    const doArchive = () => {
+      const now = new Date().toISOString().split('T')[0]
+      // Aynı gün içinde tekrar çalıştırma (performans için)
+      if (lastArchiveCheck.current === now) return
+      lastArchiveCheck.current = now
+      setBoard((b) => archiveTasks(b))
+    }
+
+    const timer = setTimeout(doArchive, 1000)
+    const interval = setInterval(doArchive, 60000) // her dakika kontrol
+    return () => { clearTimeout(timer); clearInterval(interval) }
+  }, [board?.archived?.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tema
   useEffect(() => {
@@ -274,6 +296,7 @@ function App() {
           </div>
         )}
         <div className="header-right">
+          <button className={`btn ${view === 'archive' ? 'btn-active' : ''}`} onClick={() => setView(view === 'archive' ? 'board' : 'archive')}>📁 Arşiv{board?.archived?.length > 0 ? ` (${board.archived.reduce((sum, g) => sum + g.tasks.length, 0)})` : ''}</button>
           <button className="btn btn-icon" onClick={() => setShowSettings(true)} title="Ayarlar">⚙️</button>
           <button className="btn" onClick={toggleTheme}>
             {settings.theme === 'dark' ? '☀️ Açık Mod' : '🌙 Koyu Mod'}
@@ -283,15 +306,44 @@ function App() {
         </div>
       </header>
 
-      <Board
-        board={board}
-        onRenameColumn={handleRenameColumn}
-        onDeleteColumn={handleDeleteColumn}
-        onUpdateTask={handleUpdateTask}
-        onDeleteTask={handleDeleteTask}
-        onMoveTask={handleMoveTask}
-        onCardClick={handleCardClick}
-      />
+      {view === 'board' ? (
+        <Board
+          board={board}
+          onRenameColumn={handleRenameColumn}
+          onDeleteColumn={handleDeleteColumn}
+          onUpdateTask={handleUpdateTask}
+          onDeleteTask={handleDeleteTask}
+          onMoveTask={handleMoveTask}
+          onCardClick={handleCardClick}
+        />
+      ) : (
+        <div className="archive-page">
+          <div className="archive-page-header">
+            <h2>📁 Arşiv ({board?.archived?.reduce((sum, g) => sum + g.tasks.length, 0) || 0} görev)</h2>
+            <button className="btn" onClick={() => setView('board')}>⬅ Geri</button>
+          </div>
+          <div className="archive-page-body">
+            {(!board?.archived || board.archived.length === 0) ? (
+              <p className="archive-empty">Henüz arşivlenmiş görev yok.</p>
+            ) : (
+              board.archived.map((group) => (
+                <div key={group.date} className="archive-group">
+                  <h3 className="archive-date-title">{group.label}</h3>
+                  <div className="archive-tasks">
+                    {group.tasks.map((task) => (
+                      <div key={task.id} className="archive-task">
+                        <span className={`archive-task-priority priority-${task.priority}`}>{task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '🟢'}</span>
+                        <span className="archive-task-title">{task.title}</span>
+                        {task.description && <span className="archive-task-desc">{task.description}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Görev Ekleme Modalı */}
       {showAddTaskModal && (

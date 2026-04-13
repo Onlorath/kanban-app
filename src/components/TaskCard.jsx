@@ -37,8 +37,9 @@ export default function TaskCard({ task, columnId, onUpdate, onDelete, onClick }
     wasDragged.current = true
     e.dataTransfer.setData('application/kanban', JSON.stringify({ taskId: task.id, fromColId: columnId }))
     e.dataTransfer.effectAllowed = 'move'
+    const el = e.currentTarget
     requestAnimationFrame(() => {
-      e.currentTarget.classList.add('dragging')
+      el.classList.add('dragging')
     })
   }
 

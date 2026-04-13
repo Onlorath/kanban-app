@@ -22,6 +22,7 @@ export function createDefaultBoard() {
   yesterday.setDate(yesterday.getDate() - 1)
 
   return {
+    archived: [],
     columns: [
       {
         id: 'col-todo',
@@ -66,6 +67,68 @@ export function createDefaultBoard() {
       },
     ],
   }
+}
+
+export function archiveTasks(board) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const archived = board.archived ? [...board.archived] : []
+  const columns = [...board.columns]
+
+  // col-done'daki taskları bul
+  const doneCol = columns.find((c) => c.id === 'col-done')
+  if (!doneCol) return board
+
+  const toArchive = []
+  const toKeep = []
+
+  for (const task of doneCol.tasks) {
+    const completedAt = new Date(task.completedAt || task.createdAt)
+    completedAt.setHours(0, 0, 0, 0)
+    if (completedAt < today) {
+      toArchive.push(task)
+    } else {
+      toKeep.push(task)
+    }
+  }
+
+  if (toArchive.length === 0) return board
+
+  // Arşiv gruplarını güncelle
+  for (const task of toArchive) {
+    const date = task.completedAt
+      ? task.completedAt.split('T')[0]
+      : task.createdAt.split('T')[0]
+
+    const label = new Date(date + 'T00:00:00').toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+
+    const existingGroup = archived.find((g) => g.date === date)
+    if (existingGroup) {
+      existingGroup.tasks.push(task)
+    } else {
+      archived.push({ date, label, tasks: [task] })
+    }
+  }
+
+  // Tarihe göre sırala (en yeni önce)
+  archived.sort((a, b) => b.date.localeCompare(a.date))
+
+  return {
+    ...board,
+    archived,
+    columns: columns.map((c) =>
+      c.id === 'col-done' ? { ...c, tasks: toKeep } : c
+    ),
+  }
+}
+
+export function getArchivedByDate(board, date) {
+  const group = board.archived?.find((g) => g.date === date)
+  return group ? group.tasks : []
 }
 
 export function addColumn(board, title) {
@@ -117,6 +180,13 @@ export function moveTask(board, taskId, fromColId, toColId, toIndex) {
   })
 
   if (!task) return board
+
+  // Tamamlandıya taşındığında completedAt ekle
+  if (toColId === 'col-done') {
+    task.completedAt = new Date().toISOString()
+  } else {
+    task.completedAt = undefined
+  }
 
   return {
     ...board,
